@@ -30,41 +30,59 @@ const useTypewriter = (text, speed = 45, startDelay = 800) => {
   return { displayed, done };
 };
 
-// --- PARTY BALLOON BACKGROUND ---
-const FloatingBalloons = () => {
-  const balloons = Array.from({ length: 15 }).map((_, i) => ({
-    id: i,
-    color: `hsl(${Math.random() * 360}, 80%, 60%)`,
-    left: `${Math.random() * 100}%`,
-    delay: `-${Math.random() * 15}s`,
-    duration: `${10 + Math.random() * 10}s`,
-    scale: 0.8 + Math.random() * 0.6
-  }));
+// --- SEAMLESS INFINITE VERTICAL ART CAROUSEL (LOCAL ASSETS) ---
+const FaceCollageBackground = ({ imageUrl }) => {
+  const art1 = [
+    { src: '/art1.jpg', faceX: '49%', faceY: '25%', faceW: '18%', rot: '0deg' },
+    { src: '/art2.jpg', faceX: '71%', faceY: '30%', faceW: '16%', rot: '0deg' },
+    { src: '/art3.jpg', faceX: '38%', faceY: '45%', faceW: '24%', rot: '-20deg' },
+  ];
+  
+  const art2 = [
+    { src: '/art4.jpg', faceX: '43%', faceY: '42%', faceW: '40%', rot: '-5deg' },
+    { src: '/art5.jpg', faceX: '53%', faceY: '60%', faceW: '18%', rot: '-5deg' },
+    { src: '/art6.jpg', faceX: '70%', faceY: '22%', faceW: '14%', rot: '-10deg' },
+  ];
 
-  return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-[2]">
-      {balloons.map((b) => (
-        <div 
-          key={b.id} 
-          className="absolute bottom-[-150px] w-12 h-16 rounded-[50%] opacity-40 blur-[1px]"
-          style={{
-            backgroundColor: b.color,
-            left: b.left,
-            animation: `floatUp ${b.duration} linear infinite`,
-            animationDelay: b.delay,
-            transform: `scale(${b.scale})`
-          }}
-        >
-          <div className="absolute -bottom-6 left-1/2 w-px h-8 bg-white/20" />
+  const art3 = [
+    { src: '/art7.jpg', faceX: '55%', faceY: '14%', faceW: '14%', rot: '0deg' },
+    { src: '/art8.jpg', faceX: '52%', faceY: '18%', faceW: '12%', rot: '0deg' },
+    { src: '/art9.jpg', faceX: '52%', faceY: '25%', faceW: '12%', rot: '8deg' },
+  ];
+
+  const Track = ({ items, duration, reverse }) => (
+    <div 
+      className={`w-[28vw] sm:w-[22vw] flex flex-col gap-6 sm:gap-10 pt-6 sm:pt-10 scroll-track ${reverse ? 'reverse' : ''}`} 
+      style={{ '--duration': duration }}
+    >
+      {[...items, ...items, ...items, ...items].map((art, idx) => (
+        <div key={idx} className="relative w-full border-[6px] sm:border-[10px] border-[#d4af37] shadow-[0_15px_30px_rgba(0,0,0,0.8)] bg-zinc-900 rounded-sm overflow-hidden">
+          <img src={art.src} alt="Classic Art" className="w-full h-auto object-cover opacity-90" />
+          <img 
+            src={imageUrl} 
+            alt="Face" 
+            className="absolute rounded-[40%] object-cover shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+            style={{
+              left: art.faceX, top: art.faceY, width: art.faceW, aspectRatio: '3/4',
+              transform: `translate(-50%, -50%) rotate(${art.rot})`,
+            }}
+          />
         </div>
       ))}
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-[1] opacity-50 flex justify-evenly sm:justify-center sm:gap-12 items-start bg-black">
+      <Track items={art1} duration="45s" />
+      <Track items={art2} duration="55s" reverse />
+      <Track items={art3} duration="50s" />
     </div>
   );
 };
 
 // --- ANIMATED GOOGLY EYES WITH PHYSICS ---
 const GooglyEye = ({ left, top, eyeX, eyeY }) => {
-  // Spring physics for smooth, bouncy tracking
   const springX = useSpring(eyeX, { stiffness: 300, damping: 20, mass: 0.8 });
   const springY = useSpring(eyeY, { stiffness: 300, damping: 20, mass: 0.8 });
 
@@ -75,8 +93,7 @@ const GooglyEye = ({ left, top, eyeX, eyeY }) => {
     <div 
       className="absolute bg-white rounded-full flex items-center justify-center z-10 aspect-square"
       style={{ 
-        left: `${left}%`, top: `${top}%`, width: '18%', 
-        transform: 'translate(-50%, -50%)', 
+        left: `${left}%`, top: `${top}%`, width: '18%', transform: 'translate(-50%, -50%)', 
         boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.2), 0 5px 15px rgba(0,0,0,0.5)' 
       }}
     >
@@ -89,14 +106,11 @@ const GooglyEye = ({ left, top, eyeX, eyeY }) => {
 };
 
 // --- INTERACTIVE 3D PLAYING CARD ---
-const InteractivePlayingCard = ({ imageUrl, eyeCoordinates, bites, cakeMarks, cowPhase }) => {
+const InteractivePlayingCard = ({ imageUrl, eyeCoordinates, bites, cakeMarks, cowPhase, hasFlies }) => {
   const cardRef = useRef(null);
   
-  // Card tilt values (local to the card)
   const cardX = useMotionValue(0.5);
   const cardY = useMotionValue(0.5);
-
-  // Eye tracking values (global to the screen/gyro)
   const eyeX = useMotionValue(0.5);
   const eyeY = useMotionValue(0.5);
 
@@ -112,14 +126,12 @@ const InteractivePlayingCard = ({ imageUrl, eyeCoordinates, bites, cakeMarks, co
     const checkMobile = window.matchMedia('(pointer: coarse)').matches;
     setIsMobile(checkMobile);
 
-    // 1. GLOBAL MOUSE TRACKING FOR EYES (Desktop)
     const handleGlobalMouseMove = (e) => {
       if (checkMobile || cowPhase !== 'idle') return;
       eyeX.set(e.clientX / window.innerWidth);
       eyeY.set(e.clientY / window.innerHeight);
     };
 
-    // 2. GYRO TRACKING FOR EYES & CARD TILT (Mobile)
     const handleOrientation = (event) => {
       if (!checkMobile || cowPhase !== 'idle') return;
       if (!event.gamma || !event.beta) return;
@@ -136,13 +148,11 @@ const InteractivePlayingCard = ({ imageUrl, eyeCoordinates, bites, cakeMarks, co
       eyeY.set(mappedY);
     };
 
-    // 3. ACCELEROMETER PHYSICS FOR GOOGLY EYES (Mobile Shaking)
     const handleMotion = (event) => {
       if (!checkMobile || cowPhase !== 'idle' || !event.acceleration) return;
       const ax = event.acceleration.x || 0;
       const ay = event.acceleration.y || 0;
       
-      // If phone is shaken, rattle the pupils
       if (Math.abs(ax) > 3 || Math.abs(ay) > 3) {
         eyeX.set(0.5 + (ax / 15));
         eyeY.set(0.5 - (ay / 15));
@@ -162,7 +172,6 @@ const InteractivePlayingCard = ({ imageUrl, eyeCoordinates, bites, cakeMarks, co
     };
   }, [cardX, cardY, eyeX, eyeY, cowPhase]);
 
-  // 4. LOCAL MOUSE TRACKING FOR CARD TILT (Desktop)
   const handleCardMouseMove = (e) => {
     if (isMobile || !cardRef.current || cowPhase !== 'idle') return;
     const rect = cardRef.current.getBoundingClientRect();
@@ -193,10 +202,20 @@ const InteractivePlayingCard = ({ imageUrl, eyeCoordinates, bites, cakeMarks, co
       <GooglyEye left={eyeCoordinates.leftEye.x} top={eyeCoordinates.leftEye.y} eyeX={eyeX} eyeY={eyeY} />
       <GooglyEye left={eyeCoordinates.rightEye.x} top={eyeCoordinates.rightEye.y} eyeX={eyeX} eyeY={eyeY} />
       
-      {bites >= 1 && <div className="absolute -top-[10%] -right-[10%] w-[50%] h-[50%] bg-black rounded-full" />}
-      {bites >= 2 && <div className="absolute -bottom-[20%] -left-[10%] w-[60%] h-[60%] bg-black rounded-full" />}
-      {bites >= 3 && <div className="absolute inset-0 bg-black" />} 
+      {bites >= 1 && <div className="absolute -top-[10%] -right-[10%] w-[50%] h-[50%] bg-black rounded-full z-20" />}
+      {bites >= 2 && <div className="absolute -bottom-[20%] -left-[10%] w-[60%] h-[60%] bg-black rounded-full z-20" />}
+      {bites >= 3 && <div className="absolute inset-0 bg-black z-20" />} 
 
+      {/* FLIES BUZZING INSIDE THE CARD */}
+      {hasFlies && (
+        <div className="absolute inset-0 z-30 pointer-events-none">
+          <div className="fly" style={{ top: '10%', left: '10%', animationDelay: '0s' }}>🪰</div>
+          <div className="fly" style={{ top: '50%', left: '5%', animationDelay: '0.5s' }}>🪰</div>
+          <div className="fly" style={{ top: '20%', right: '10%', animationDelay: '1s' }}>🪰</div>
+        </div>
+      )}
+
+      {/* CAKE SPLATS ON THE CARD */}
       {cakeMarks && cakeMarks.length > 0 && (
         <div className="absolute inset-0 opacity-80 pointer-events-none z-20">
           {cakeMarks.map((mark) => (
@@ -488,72 +507,6 @@ const FlappyBird = ({ imageUrl, name, addCurrency }) => {
   );
 };
 
-// --- SEAMLESS INFINITE VERTICAL ART CAROUSEL (LOCAL ASSETS) ---
-// --- SEAMLESS INFINITE VERTICAL ART CAROUSEL (LOCAL ASSETS) ---
-const FaceCollageBackground = ({ imageUrl }) => {
-  // Column 1
-  const art1 = [
-    // Mona Lisa
-    { src: '/art1.webp', faceX: '49%', faceY: '25%', faceW: '18%', rot: '0deg' },
-    // American Gothic (Covering the man's face)
-    { src: '/art2.jpg', faceX: '71%', faceY: '30%', faceW: '16%', rot: '0deg' },
-    // Girl with a Pearl Earring
-    { src: '/art3.jpg', faceX: '38%', faceY: '45%', faceW: '24%', rot: '-20deg' },
-  ];
-  
-  // Column 2
-  const art2 = [
-    // Van Gogh
-    { src: '/art4.jpg', faceX: '43%', faceY: '42%', faceW: '40%', rot: '-5deg' },
-    // The Scream
-    { src: '/art5.jpg', faceX: '53%', faceY: '60%', faceW: '18%', rot: '-5deg' },
-    // Napoleon
-    { src: '/art6.jpg', faceX: '70%', faceY: '22%', faceW: '14%', rot: '-10deg' },
-  ];
-
-  // Column 3
-  const art3 = [
-    // Adele Bloch-Bauer
-    { src: '/art7.jpg', faceX: '55%', faceY: '14%', faceW: '14%', rot: '0deg' },
-    // George Washington
-    { src: '/art8.jpg', faceX: '52%', faceY: '18%', faceW: '12%', rot: '0deg' },
-    // The Milkmaid
-    { src: '/art9.png', faceX: '52%', faceY: '25%', faceW: '12%', rot: '8deg' },
-  ];
-
-  const Track = ({ items, duration, reverse }) => (
-    <div 
-      className={`w-[28vw] sm:w-[22vw] flex flex-col gap-6 sm:gap-10 pt-6 sm:pt-10 scroll-track ${reverse ? 'reverse' : ''}`} 
-      style={{ '--duration': duration }}
-    >
-      {[...items, ...items, ...items, ...items].map((art, idx) => (
-        <div key={idx} className="relative w-full border-[6px] sm:border-[10px] border-[#d4af37] shadow-[0_15px_30px_rgba(0,0,0,0.8)] bg-zinc-900 rounded-sm overflow-hidden">
-          <img src={art.src} alt="Classic Art" className="w-full h-auto object-cover opacity-90" />
-          <img 
-            src={imageUrl} 
-            alt="Face" 
-            className="absolute rounded-[40%] object-cover shadow-[0_0_15px_rgba(0,0,0,0.8)]"
-            style={{
-              left: art.faceX, 
-              top: art.faceY, 
-              width: art.faceW, 
-              aspectRatio: '3/4',
-              transform: `translate(-50%, -50%) rotate(${art.rot})`,
-            }}
-          />
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-[1] opacity-50 flex justify-evenly sm:justify-center sm:gap-12 items-start bg-black">
-      <Track items={art1} duration="45s" />
-      <Track items={art2} duration="55s" reverse />
-      <Track items={art3} duration="50s" />
-    </div>
-  );
-};
 // --- MAIN HERO PAGE ---
 export default function HeroPage() {
   const { data } = useParams(); 
@@ -690,34 +643,32 @@ export default function HeroPage() {
     }, 800);
   };
 
-  if (error) return <div className="h-screen flex items-center justify-center bg-black text-white text-2xl">{error}</div>;
-  if (!parsedData) return <div className="h-screen bg-black" />;
-
+  // Restored the whole-site shrinking logic (without causing mobile black screens!)
   const getSiteTransform = () => {
     if (cowPhase === 'zooming') return 'scale-[4] -translate-y-[10vh] opacity-0'; 
-    if (cowPhase !== 'idle') return 'scale-[0.25] translate-y-[20vh] rounded-[100px] shadow-[0_0_100px_black] pointer-events-none overflow-hidden'; 
+    if (cowPhase !== 'idle') return 'scale-[0.25] translate-y-[10vh] sm:translate-y-[20vh] rounded-[100px] shadow-[0_0_100px_black] overflow-hidden pointer-events-none'; 
     return 'scale-100 translate-y-0 opacity-100'; 
   };
 
-  return (
-    <div className={`relative w-full min-h-screen bg-black text-white z-10 transition-all duration-[1200ms] ease-in-out origin-center overflow-x-hidden ${getSiteTransform()}`}>
-      
-      <div ref={topRef} className="absolute top-0 left-0 w-full h-1" />
+  if (error) return <div className="h-screen flex items-center justify-center bg-black text-white text-2xl">{error}</div>;
+  if (!parsedData) return <div className="h-screen bg-black" />;
 
+  return (
+    // Outer Root Div: Backgrounds remain full size while inner content shrinks
+    <div className="relative w-full min-h-screen bg-black text-white overflow-x-hidden">
+      
+      {/* 1. BACKGROUNDS (Never shrink) */}
+      <FaceCollageBackground imageUrl={parsedData.i} />
+      <div className={`fixed inset-0 z-[0] transition-opacity duration-1000 bg-cover bg-center ${cowPhase !== 'idle' ? 'opacity-100' : 'opacity-0'}`} style={{ backgroundImage: "url('/stable.jpg')" }} />
+
+      {/* 2. PRANK OVERLAYS (Outside shrinking container so cow/pie stays big) */}
       <NamePromptModal 
         isOpen={!!pendingPrank} 
         onSubmit={(name) => { setVisitorName(name); executePrank(pendingPrank.cost, pendingPrank.type, name); }} 
         onCancel={() => setPendingPrank(null)} 
       />
 
-     {/* ANIMATED ART COLLAGE BACKGROUND */}
-      <FaceCollageBackground imageUrl={parsedData.i} />
-
-      {/* The Cow Background Fallback (Only shows when cow pranks happen) */}
-      <div className={`fixed inset-0 z-[-1] transition-opacity duration-1000 bg-zinc-950 ${cowPhase !== 'idle' ? 'opacity-100' : 'opacity-0'}`} />
-
-      
-      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 items-center pointer-events-none w-full px-4">
+      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none w-full px-4">
         {toasts.map(toast => (
           <div key={toast.id} className="bg-zinc-900 border border-white/20 text-white px-6 py-3 rounded-full font-medium shadow-2xl animate-[fadeRise_0.5s_ease-out_forwards] text-sm whitespace-nowrap">
             {toast.message}
@@ -725,7 +676,7 @@ export default function HeroPage() {
         ))}
       </div>
 
-      <div className="fixed top-6 sm:top-10 right-4 sm:right-8 z-[60] flex flex-col gap-3 items-end">
+      <div className="fixed top-6 sm:top-10 right-4 sm:right-8 z-[200] flex flex-col gap-3 items-end">
         <div className="bg-black/80 backdrop-blur-md border border-yellow-500/50 text-yellow-400 px-4 py-2 rounded-full font-bold shadow-[0_0_15px_rgba(234,179,8,0.3)] text-sm sm:text-base">
           🪙 {currency} Coins
         </div>
@@ -739,24 +690,11 @@ export default function HeroPage() {
       </div>
 
       <style>{`
-      .scroll-track {
-          animation: marqueeVert var(--duration) linear infinite;
-          will-change: transform;
-        }
-        .scroll-track.reverse {
-          animation-direction: reverse;
-        }
-        @keyframes marqueeVert {
-          0% { transform: translateY(0); }
-          /* Because we duplicated the items 4 times, shifting up exactly 25% skips perfectly back to frame 1! */
-          100% { transform: translateY(-25%); }
-        }
-        @keyframes floatUp {
-          0% { transform: translateY(100vh) scale(1) rotate(0deg); }
-          100% { transform: translateY(-120vh) scale(1.2) rotate(20deg); }
-        }
+        .scroll-track { animation: marqueeVert var(--duration) linear infinite; will-change: transform; }
+        .scroll-track.reverse { animation-direction: reverse; }
+        @keyframes marqueeVert { 0% { transform: translateY(0); } 100% { transform: translateY(-25%); } }
         @keyframes flyBuzz { 0% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(20px, -30px) rotate(45deg); } 50% { transform: translate(-30px, -10px) rotate(-20deg); } 75% { transform: translate(15px, 20px) rotate(60deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
-        .fly { animation: flyBuzz 2s infinite linear; position: absolute; font-size: 2rem; pointer-events: none; z-index: 50; }
+        .fly { animation: flyBuzz 2s infinite linear; position: absolute; font-size: 2rem; pointer-events: none; }
         @keyframes cowWalkIn { 0% { transform: translateX(-150vw); } 100% { transform: translateX(-5vw); } }
         @keyframes cowWalkOut { 0% { transform: translateX(-5vw); } 100% { transform: translateX(150vw); } }
         @keyframes dropAndTilt { 0% { transform: translateY(-100vh) rotate(0deg); } 70% { transform: translateY(0) rotate(0deg); } 90% { transform: translateY(0) rotate(45deg); opacity: 1; } 100% { transform: translateY(0) rotate(90deg); opacity: 0; } }
@@ -766,6 +704,7 @@ export default function HeroPage() {
         @keyframes fadeRise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
+      {/* Global Prank Overlays */}
       {(cowPhase !== 'idle' && cowPhase !== 'shrinking') && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none overflow-hidden">
           {(cowPhase === 'walking' || cowPhase === 'pooping' || cowPhase === 'leaving') && (
@@ -791,10 +730,10 @@ export default function HeroPage() {
       )}
 
       {isPieing && (
-        <div className="fixed inset-0 z-[100] pointer-events-none flex flex-col items-center justify-center">
-          <img src="/cake.png" className="w-64 h-64 sm:w-96 sm:h-96 object-contain animate-[dropAndTilt_1.5s_ease-in_forwards] relative z-[102]" />
-          <div className="absolute inset-0 flex items-center justify-center z-[101]">
-            <svg viewBox="0 0 100 100" className="w-[150vw] h-[150vw] opacity-0 animate-[splatExplode_3s_ease-out_1.2s_forwards]" style={{ fill: '#3b82f6' }}>
+        <div className="fixed inset-0 z-[100] pointer-events-none flex flex-col items-center justify-center pb-[20vh] sm:pb-[10vh]">
+          <img src="/cake.png" className="w-48 h-48 sm:w-80 sm:h-80 object-contain animate-[dropAndTilt_1.5s_ease-in_forwards] relative z-[102]" />
+          <div className="absolute inset-0 flex items-center justify-center pb-[20vh] sm:pb-[10vh] z-[101]">
+            <svg viewBox="0 0 100 100" className="w-[100vw] h-[100vw] sm:w-[60vw] sm:h-[60vw] opacity-0 animate-[splatExplode_3s_ease-out_1.2s_forwards]" style={{ fill: '#3b82f6' }}>
               <path d="M50 10 C 60 30, 80 20, 75 40 C 95 45, 80 60, 90 75 C 70 70, 60 95, 50 80 C 40 95, 30 70, 10 75 C 20 60, 5 45, 25 40 C 20 20, 40 30, 50 10 Z" />
             </svg>
           </div>
@@ -805,103 +744,102 @@ export default function HeroPage() {
         <Link to="/" className="text-[14px] sm:text-[16px] text-white/70 hover:text-white bg-black/40 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full backdrop-blur-md border border-white/10 pointer-events-auto transition-colors z-[60]">Create new wish</Link>
       </nav>
 
-      <main className="relative z-10 flex flex-col justify-center items-center px-5 sm:px-10 pointer-events-none pt-32 pb-20 min-h-screen">
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="w-full flex justify-center pointer-events-auto"
-        >
-          <InteractivePlayingCard 
-            imageUrl={parsedData.i} 
-            eyeCoordinates={eyeCoordinates} 
-            bites={bites}
-            cakeMarks={cakeMarks}
-            cowPhase={cowPhase}
-          />
-        </motion.div>
+      {/* 3. SHRINKING CONTENT WRAPPER */}
+      <div className={`relative w-full z-10 transition-transform duration-[1200ms] ease-in-out origin-top sm:origin-center ${getSiteTransform()}`}>
+        <div ref={topRef} className="absolute top-0 left-0 w-full h-1" />
 
-        <div className="max-w-2xl mx-auto relative pointer-events-auto text-center w-full mt-8">
-          {hasFlies && (
-            <>
-              <div className="fly" style={{ top: '-50px', left: '10%', animationDelay: '0s' }}>🪰</div>
-              <div className="fly" style={{ top: '50px', left: '-5%', animationDelay: '0.5s' }}>🪰</div>
-              <div className="fly" style={{ top: '20px', right: '10%', animationDelay: '1s' }}>🪰</div>
-            </>
-          )}
-          <h1 className="select-none mb-4 font-bold tracking-tight" style={{ fontSize: 'clamp(32px, 8vw, 80px)', lineHeight: 1.1 }}>
-            Happy Birthday,<br/>{parsedData.n}!
-          </h1>
-          <p className="text-white/90 mb-6 min-h-[60px] font-medium" style={{ fontSize: 'clamp(18px, 4vw, 28px)', lineHeight: 1.4 }}>
-            {displayed}
-            {!done && <span className="inline-block w-[3px] h-[1em] bg-white align-middle ml-[4px]" style={{ animation: 'blink 1s step-end infinite' }} />}
-          </p>
-          <div className="text-white/80 text-[18px] sm:text-[24px] italic font-medium">— From {parsedData.s || 'Anonymous'}</div>
-        </div>
-      </main>
+        <main className="relative flex flex-col justify-center items-center px-5 sm:px-10 pointer-events-none pt-32 pb-20 min-h-screen">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="w-full flex justify-center pointer-events-auto"
+          >
+            <InteractivePlayingCard 
+              imageUrl={parsedData.i} 
+              eyeCoordinates={eyeCoordinates} 
+              bites={bites}
+              cakeMarks={cakeMarks}
+              cowPhase={cowPhase}
+              hasFlies={hasFlies}
+            />
+          </motion.div>
 
-      <section className="relative z-20 pt-10 pb-32 px-4 sm:px-8 md:px-10 overflow-hidden bg-black border-t border-white/5">
-      {/* 1. SMOOTH GRADIENT FADE (Fades the paintings into the dark gracefully) */}
-        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-transparent to-black pointer-events-none -translate-y-full" />
-        
-        {/* 2. SVG WAVE DIVIDER (Creates the organic curved edge) */}
-        <div className="absolute top-0 left-0 w-full leading-none pointer-events-none -translate-y-[99%] z-10">
-          <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-full h-[50px] sm:h-[90px]">
-            <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" fill="#000000"></path>
-          </svg>
-        </div>
-        <div className="max-w-6xl mx-auto">
-          <FadeInOnScroll delay={0}>
-            <div className="text-center mb-10 sm:mb-16">
-              <h2 className="text-3xl md:text-5xl text-white mb-2 sm:mb-4 font-bold tracking-tight">Earn Coins</h2>
-            </div>
-          </FadeInOnScroll>
+          <div className="max-w-2xl mx-auto relative pointer-events-auto text-center w-full mt-8">
+            <h1 className="select-none mb-4 font-bold tracking-tight" style={{ fontSize: 'clamp(32px, 8vw, 80px)', lineHeight: 1.1 }}>
+              Happy Birthday,<br/>{parsedData.n}!
+            </h1>
+            <p className="text-white/90 mb-6 min-h-[60px] font-medium" style={{ fontSize: 'clamp(18px, 4vw, 28px)', lineHeight: 1.4 }}>
+              {displayed}
+              {!done && <span className="inline-block w-[3px] h-[1em] bg-white align-middle ml-[4px]" style={{ animation: 'blink 1s step-end infinite' }} />}
+            </p>
+            <div className="text-white/80 text-[18px] sm:text-[24px] italic font-medium">— From {parsedData.s || 'Anonymous'}</div>
+          </div>
+        </main>
+
+        <section className="relative z-20 pt-16 pb-32 px-4 sm:px-8 md:px-10 bg-black">
+          {/* SMOOTH GRADIENT FADE */}
+          <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-transparent to-black pointer-events-none -translate-y-full" />
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20 sm:mb-24">
+          {/* SVG WAVE DIVIDER */}
+          <div className="absolute top-0 left-0 w-full leading-none pointer-events-none -translate-y-[99%] z-10">
+            <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-full h-[50px] sm:h-[90px]">
+              <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" fill="#000000"></path>
+            </svg>
+          </div>
+
+          <div className="max-w-6xl mx-auto relative z-20">
+            <FadeInOnScroll delay={0}>
+              <div className="text-center mb-10 sm:mb-16">
+                <h2 className="text-3xl md:text-5xl text-white mb-2 sm:mb-4 font-bold tracking-tight">Earn Coins</h2>
+              </div>
+            </FadeInOnScroll>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20 sm:mb-24">
+              <FadeInOnScroll delay={100}>
+                <CutTheCake wishId={data} addCurrency={addCurrency} showToast={showToast} visitorName={visitorName} setVisitorName={setVisitorName} />
+              </FadeInOnScroll>
+              
+              <FadeInOnScroll delay={200}>
+                <WhackAMole imageUrl={parsedData.i} name={parsedData.n} addCurrency={addCurrency} />
+              </FadeInOnScroll>
+              
+              <FadeInOnScroll delay={300}>
+                <FlappyBird imageUrl={parsedData.i} name={parsedData.n} addCurrency={addCurrency} />
+              </FadeInOnScroll>
+            </div>
+
             <FadeInOnScroll delay={100}>
-              <CutTheCake wishId={data} addCurrency={addCurrency} showToast={showToast} visitorName={visitorName} setVisitorName={setVisitorName} />
+              <div className="text-center mb-8 sm:mb-10 pointer-events-auto">
+                <ShoppingCart className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-3 sm:mb-4 text-yellow-500" />
+                <h2 className="text-3xl md:text-5xl text-white mb-4 font-bold tracking-tight">The Prank Shop</h2>
+              </div>
             </FadeInOnScroll>
             
-            <FadeInOnScroll delay={200}>
-              <WhackAMole imageUrl={parsedData.i} name={parsedData.n} addCurrency={addCurrency} />
-            </FadeInOnScroll>
-            
-            <FadeInOnScroll delay={300}>
-              <FlappyBird imageUrl={parsedData.i} name={parsedData.n} addCurrency={addCurrency} />
-            </FadeInOnScroll>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-3xl mx-auto pointer-events-auto">
+              <FadeInOnScroll delay={200}>
+                <button onClick={() => handlePrankIntent(30, 'cow')} disabled={currency < 30} className="w-full flex items-center justify-between bg-zinc-900 border border-white/10 p-5 sm:p-6 rounded-3xl hover:bg-zinc-800 disabled:opacity-50 text-left transition-colors">
+                  <div>
+                    <h4 className="text-xl sm:text-2xl font-bold text-white mb-1">Cow Attack 🐄</h4>
+                    <p className="text-zinc-400 text-xs sm:text-sm">A hungry cow eats their photo.</p>
+                  </div>
+                  <span className="font-bold text-yellow-500 bg-yellow-500/10 px-3 sm:px-4 py-2 rounded-full text-sm sm:text-base">30 Coins</span>
+                </button>
+              </FadeInOnScroll>
 
-          <FadeInOnScroll delay={100}>
-            <div className="text-center mb-8 sm:mb-10 pointer-events-auto">
-              <ShoppingCart className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-3 sm:mb-4 text-yellow-500" />
-              <h2 className="text-3xl md:text-5xl text-white mb-4 font-bold tracking-tight">The Prank Shop</h2>
+              <FadeInOnScroll delay={300}>
+                <button onClick={() => handlePrankIntent(50, 'pie')} disabled={currency < 50} className="w-full flex items-center justify-between bg-zinc-900 border border-white/10 p-5 sm:p-6 rounded-3xl hover:bg-zinc-800 disabled:opacity-50 text-left transition-colors">
+                  <div>
+                    <h4 className="text-xl sm:text-2xl font-bold text-white mb-1">Cake Smash 🎂</h4>
+                    <p className="text-zinc-400 text-xs sm:text-sm">Drop a giant cake on the screen.</p>
+                  </div>
+                  <span className="font-bold text-yellow-500 bg-yellow-500/10 px-3 sm:px-4 py-2 rounded-full text-sm sm:text-base">50 Coins</span>
+                </button>
+              </FadeInOnScroll>
             </div>
-          </FadeInOnScroll>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-3xl mx-auto pointer-events-auto">
-            <FadeInOnScroll delay={200}>
-              <button onClick={() => handlePrankIntent(30, 'cow')} disabled={currency < 30} className="w-full flex items-center justify-between bg-zinc-900 border border-white/10 p-5 sm:p-6 rounded-3xl hover:bg-zinc-800 disabled:opacity-50 text-left transition-colors">
-                <div>
-                  <h4 className="text-xl sm:text-2xl font-bold text-white mb-1">Cow Attack 🐄</h4>
-                  <p className="text-zinc-400 text-xs sm:text-sm">A hungry cow eats their photo.</p>
-                </div>
-                <span className="font-bold text-yellow-500 bg-yellow-500/10 px-3 sm:px-4 py-2 rounded-full text-sm sm:text-base">30 Coins</span>
-              </button>
-            </FadeInOnScroll>
-
-            <FadeInOnScroll delay={300}>
-              <button onClick={() => handlePrankIntent(50, 'pie')} disabled={currency < 50} className="w-full flex items-center justify-between bg-zinc-900 border border-white/10 p-5 sm:p-6 rounded-3xl hover:bg-zinc-800 disabled:opacity-50 text-left transition-colors">
-                <div>
-                  <h4 className="text-xl sm:text-2xl font-bold text-white mb-1">Cake Smash 🎂</h4>
-                  <p className="text-zinc-400 text-xs sm:text-sm">Drop a giant cake on the screen.</p>
-                </div>
-                <span className="font-bold text-yellow-500 bg-yellow-500/10 px-3 sm:px-4 py-2 rounded-full text-sm sm:text-base">50 Coins</span>
-              </button>
-            </FadeInOnScroll>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
