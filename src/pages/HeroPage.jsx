@@ -33,7 +33,7 @@ const useTypewriter = (text, speed = 45, startDelay = 800) => {
 // --- SEAMLESS INFINITE VERTICAL ART CAROUSEL (LOCAL ASSETS) ---
 const FaceCollageBackground = ({ imageUrl }) => {
   const art1 = [
-    { src: '/art1.jpg', faceX: '49%', faceY: '25%', faceW: '18%', rot: '0deg' },
+    { src: '/art1.webp', faceX: '49%', faceY: '25%', faceW: '18%', rot: '0deg' },
     { src: '/art2.jpg', faceX: '71%', faceY: '30%', faceW: '16%', rot: '0deg' },
     { src: '/art3.jpg', faceX: '38%', faceY: '45%', faceW: '24%', rot: '-20deg' },
   ];
@@ -47,7 +47,7 @@ const FaceCollageBackground = ({ imageUrl }) => {
   const art3 = [
     { src: '/art7.jpg', faceX: '55%', faceY: '14%', faceW: '14%', rot: '0deg' },
     { src: '/art8.jpg', faceX: '52%', faceY: '18%', faceW: '12%', rot: '0deg' },
-    { src: '/art9.jpg', faceX: '52%', faceY: '25%', faceW: '12%', rot: '8deg' },
+    { src: '/art9.png', faceX: '52%', faceY: '25%', faceW: '12%', rot: '8deg' },
   ];
 
   const Track = ({ items, duration, reverse }) => (
