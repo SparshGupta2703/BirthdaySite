@@ -30,100 +30,183 @@ const useTypewriter = (text, speed = 45, startDelay = 800) => {
   return { displayed, done };
 };
 
-// --- RESPONSIVE GOOGLY EYES ---
-const GooglyEye = ({ left, top, mouseX, mouseY }) => {
-  // Using percentages so the pupil stays inside the eye on all screen sizes
-  const pupilX = useTransform(mouseX, [0, 1], ['-45%', '45%']);
-  const pupilY = useTransform(mouseY, [0, 1], ['-45%', '45%']);
+// --- PARTY BALLOON BACKGROUND ---
+const FloatingBalloons = () => {
+  const balloons = Array.from({ length: 15 }).map((_, i) => ({
+    id: i,
+    color: `hsl(${Math.random() * 360}, 80%, 60%)`,
+    left: `${Math.random() * 100}%`,
+    delay: `-${Math.random() * 15}s`,
+    duration: `${10 + Math.random() * 10}s`,
+    scale: 0.8 + Math.random() * 0.6
+  }));
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-[2]">
+      {balloons.map((b) => (
+        <div 
+          key={b.id} 
+          className="absolute bottom-[-150px] w-12 h-16 rounded-[50%] opacity-40 blur-[1px]"
+          style={{
+            backgroundColor: b.color,
+            left: b.left,
+            animation: `floatUp ${b.duration} linear infinite`,
+            animationDelay: b.delay,
+            transform: `scale(${b.scale})`
+          }}
+        >
+          <div className="absolute -bottom-6 left-1/2 w-px h-8 bg-white/20" />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// --- ANIMATED GOOGLY EYES WITH PHYSICS ---
+const GooglyEye = ({ left, top, eyeX, eyeY }) => {
+  // Spring physics for smooth, bouncy tracking
+  const springX = useSpring(eyeX, { stiffness: 300, damping: 20, mass: 0.8 });
+  const springY = useSpring(eyeY, { stiffness: 300, damping: 20, mass: 0.8 });
+
+  const pupilX = useTransform(springX, [0, 1], ['-35%', '35%']);
+  const pupilY = useTransform(springY, [0, 1], ['-35%', '35%']);
 
   return (
     <div 
       className="absolute bg-white rounded-full flex items-center justify-center z-10 aspect-square"
-      // Width is exactly 12% of the total 3:4 container width. Scales perfectly!
-      style={{ left, top, width: '12%', transform: 'translate(-50%, -50%)', boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.6), 0 5px 15px rgba(0,0,0,0.8)' }}
+      style={{ 
+        left: `${left}%`, top: `${top}%`, width: '18%', 
+        transform: 'translate(-50%, -50%)', 
+        boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.2), 0 5px 15px rgba(0,0,0,0.5)' 
+      }}
     >
       <motion.div 
-        className="w-[45%] h-[45%] bg-black rounded-full shadow-[inset_0_-2px_5px_rgba(255,255,255,0.4)]"
+        className="w-[45%] h-[45%] bg-zinc-900 rounded-full shadow-[inset_0_-2px_4px_rgba(255,255,255,0.4)]"
         style={{ x: pupilX, y: pupilY }}
       />
     </div>
   );
 };
 
-// --- MOBILE-OPTIMIZED 3D PARALLAX BACKGROUND ---
-const FullscreenInteractiveBackground = ({ imageUrl, bites, cakeMarks, cowPhase }) => {
-  const mouseX = useMotionValue(0.5);
-  const mouseY = useMotionValue(0.5);
+// --- INTERACTIVE 3D PLAYING CARD ---
+const InteractivePlayingCard = ({ imageUrl, eyeCoordinates, bites, cakeMarks, cowPhase }) => {
+  const cardRef = useRef(null);
+  
+  // Card tilt values (local to the card)
+  const cardX = useMotionValue(0.5);
+  const cardY = useMotionValue(0.5);
 
-  // Softened the tilt degrees (5 and -5) so it doesn't clip off the screen on mobile
-  const rotateX = useSpring(useTransform(mouseY, [0, 1], [5, -5]), { stiffness: 100, damping: 30 });
-  const rotateY = useSpring(useTransform(mouseX, [0, 1], [-5, 5]), { stiffness: 100, damping: 30 });
+  // Eye tracking values (global to the screen/gyro)
+  const eyeX = useMotionValue(0.5);
+  const eyeY = useMotionValue(0.5);
+
+  const mouseRotateX = useSpring(useTransform(cardY, [0, 1], [14, -14]), { stiffness: 180, damping: 22 });
+  const mouseRotateY = useSpring(useTransform(cardX, [0, 1], [-14, 14]), { stiffness: 180, damping: 22 });
+  
+  const deviceRotateX = useSpring(useTransform(cardY, [0, 1], [14, -14]), { stiffness: 90, damping: 18 });
+  const deviceRotateY = useSpring(useTransform(cardX, [0, 1], [-14, 14]), { stiffness: 90, damping: 18 });
+
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (cowPhase !== 'idle') return;
-      mouseX.set(e.clientX / window.innerWidth);
-      mouseY.set(e.clientY / window.innerHeight);
+    const checkMobile = window.matchMedia('(pointer: coarse)').matches;
+    setIsMobile(checkMobile);
+
+    // 1. GLOBAL MOUSE TRACKING FOR EYES (Desktop)
+    const handleGlobalMouseMove = (e) => {
+      if (checkMobile || cowPhase !== 'idle') return;
+      eyeX.set(e.clientX / window.innerWidth);
+      eyeY.set(e.clientY / window.innerHeight);
     };
 
-    const handleOrientation = (e) => {
-      if (cowPhase !== 'idle') return;
-      let { beta, gamma } = e;
-      if (beta === null || gamma === null) return;
+    // 2. GYRO TRACKING FOR EYES & CARD TILT (Mobile)
+    const handleOrientation = (event) => {
+      if (!checkMobile || cowPhase !== 'idle') return;
+      if (!event.gamma || !event.beta) return;
       
-      beta = Math.max(-45, Math.min(45, beta)); 
-      gamma = Math.max(-45, Math.min(45, gamma)); 
+      const gamma = Math.max(-45, Math.min(45, event.gamma));
+      const beta = Math.max(-45, Math.min(45, event.beta));
       
-      mouseX.set((gamma + 45) / 90);
-      mouseY.set((beta + 45) / 90);
+      const mappedX = (gamma + 45) / 90;
+      const mappedY = (beta + 45) / 90;
+
+      cardX.set(mappedX);
+      cardY.set(mappedY);
+      eyeX.set(mappedX);
+      eyeY.set(mappedY);
     };
 
-    const handleMouseLeave = () => { mouseX.set(0.5); mouseY.set(0.5); };
+    // 3. ACCELEROMETER PHYSICS FOR GOOGLY EYES (Mobile Shaking)
+    const handleMotion = (event) => {
+      if (!checkMobile || cowPhase !== 'idle' || !event.acceleration) return;
+      const ax = event.acceleration.x || 0;
+      const ay = event.acceleration.y || 0;
+      
+      // If phone is shaken, rattle the pupils
+      if (Math.abs(ax) > 3 || Math.abs(ay) > 3) {
+        eyeX.set(0.5 + (ax / 15));
+        eyeY.set(0.5 - (ay / 15));
+      }
+    };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('deviceorientation', handleOrientation);
-    window.addEventListener('mouseleave', handleMouseLeave);
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    if (checkMobile) {
+      window.addEventListener('deviceorientation', handleOrientation);
+      window.addEventListener('devicemotion', handleMotion);
+    }
     
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('deviceorientation', handleOrientation);
-      window.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('devicemotion', handleMotion);
     };
-  }, [cowPhase, mouseX, mouseY]);
+  }, [cardX, cardY, eyeX, eyeY, cowPhase]);
+
+  // 4. LOCAL MOUSE TRACKING FOR CARD TILT (Desktop)
+  const handleCardMouseMove = (e) => {
+    if (isMobile || !cardRef.current || cowPhase !== 'idle') return;
+    const rect = cardRef.current.getBoundingClientRect();
+    cardX.set((e.clientX - rect.left) / rect.width);
+    cardY.set((e.clientY - rect.top) / rect.height);
+  };
+
+  const handleCardMouseLeave = () => {
+    if (isMobile) return;
+    cardX.set(0.5);
+    cardY.set(0.5);
+  };
 
   return (
-    <div className="fixed inset-0 z-0 bg-black overflow-hidden pointer-events-none" style={{ perspective: '1200px' }}>
-      <motion.div 
-        style={{ rotateX, rotateY, scale: 1.15, transformStyle: "preserve-3d" }} 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-full h-full"
-      >
-        {/* MAGIC ASPECT RATIO BOX: Always covers viewport, always maintains exactly 3:4 */}
-        <div 
-          className="relative pointer-events-none shadow-[0_0_100px_rgba(0,0,0,1)]"
-          style={{ width: 'max(100vw, 75dvh)', height: 'max(133.33vw, 100dvh)' }}
-        >
-          <img src={imageUrl} alt="Background" className="w-full h-full object-cover" />
-          
-          <GooglyEye left="28%" top="35%" mouseX={mouseX} mouseY={mouseY} />
-          <GooglyEye left="72%" top="35%" mouseX={mouseX} mouseY={mouseY} />
-          
-          {bites >= 1 && <div className="absolute -top-[10%] -right-[10%] w-[50vw] h-[50vw] bg-black rounded-full" />}
-          {bites >= 2 && <div className="absolute -bottom-[20%] -left-[10%] w-[60vw] h-[60vw] bg-black rounded-full" />}
-          {bites >= 3 && <div className="absolute inset-0 bg-black" />} 
-          
-          {cakeMarks.length > 0 && (
-            <div className="absolute inset-0 opacity-80 pointer-events-none z-20">
-              {cakeMarks.map((mark) => (
-                <svg key={mark.id} viewBox="0 0 100 100" className="absolute w-24 h-24 sm:w-40 sm:h-40 fill-blue-500/80 drop-shadow-xl" style={{ top: mark.top, left: mark.left, transform: `rotate(${mark.rotation}deg)` }}>
-                  <path d="M50 10 C 60 30, 80 20, 75 40 C 95 45, 80 60, 90 75 C 70 70, 60 95, 50 80 C 40 95, 30 70, 10 75 C 20 60, 5 45, 25 40 C 20 20, 40 30, 50 10 Z" />
-                </svg>
-              ))}
-            </div>
-          )}
+    <motion.div
+      ref={cardRef}
+      onMouseMove={handleCardMouseMove}
+      onMouseLeave={handleCardMouseLeave}
+      style={{
+        rotateX: isMobile ? deviceRotateX : mouseRotateX,
+        rotateY: isMobile ? deviceRotateY : mouseRotateY,
+        transformStyle: "preserve-3d",
+      }}
+      className={`w-64 sm:w-80 aspect-[3/4] mx-auto rounded-[2rem] relative shadow-[0_30px_60px_rgba(0,0,0,0.6)] border border-white/10 overflow-hidden mb-10 bg-zinc-900 transition-opacity duration-300 ${bites >= 3 ? 'opacity-0' : 'opacity-100'} z-10`}
+    >
+      <img src={imageUrl} alt="Hero" className="w-full h-full object-cover pointer-events-none" />
+      
+      <GooglyEye left={eyeCoordinates.leftEye.x} top={eyeCoordinates.leftEye.y} eyeX={eyeX} eyeY={eyeY} />
+      <GooglyEye left={eyeCoordinates.rightEye.x} top={eyeCoordinates.rightEye.y} eyeX={eyeX} eyeY={eyeY} />
+      
+      {bites >= 1 && <div className="absolute -top-[10%] -right-[10%] w-[50%] h-[50%] bg-black rounded-full" />}
+      {bites >= 2 && <div className="absolute -bottom-[20%] -left-[10%] w-[60%] h-[60%] bg-black rounded-full" />}
+      {bites >= 3 && <div className="absolute inset-0 bg-black" />} 
+
+      {cakeMarks && cakeMarks.length > 0 && (
+        <div className="absolute inset-0 opacity-80 pointer-events-none z-20">
+          {cakeMarks.map((mark) => (
+            <svg key={mark.id} viewBox="0 0 100 100" className="absolute w-24 h-24 sm:w-40 sm:h-40 fill-blue-500/80 drop-shadow-xl" style={{ top: mark.top, left: mark.left, transform: `rotate(${mark.rotation}deg)` }}>
+              <path d="M50 10 C 60 30, 80 20, 75 40 C 95 45, 80 60, 90 75 C 70 70, 60 95, 50 80 C 40 95, 30 70, 10 75 C 20 60, 5 45, 25 40 C 20 20, 40 30, 50 10 Z" />
+            </svg>
+          ))}
         </div>
-      </motion.div>
-      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/90 pointer-events-none" />
-    </div>
+      )}
+    </motion.div>
   );
 };
 
@@ -169,24 +252,15 @@ const CutTheCake = ({ wishId, addCurrency, showToast, visitorName, setVisitorNam
   const [leaderboard, setLeaderboard] = useState([]);
   const [inputName, setInputName] = useState(visitorName || '');
   const [knifePos, setKnifePos] = useState(50);
-  const cakeRef = useRef(null);
 
   const startNewGame = () => {
     setTarget(Math.floor(Math.random() * 60) + 20); 
     setCut(null);
     setPhase('playing');
+    setKnifePos(50);
   };
 
   useEffect(() => { startNewGame(); }, []);
-
-  const handleMouseMove = (e) => {
-    if (phase !== 'playing' || !cakeRef.current) return;
-    const rect = cakeRef.current.getBoundingClientRect();
-    // Support for both mouse and touch events
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    setKnifePos((x / rect.width) * 100);
-  };
 
   const handleCut = () => {
     if (phase !== 'playing') return;
@@ -228,37 +302,27 @@ const CutTheCake = ({ wishId, addCurrency, showToast, visitorName, setVisitorNam
         <div className="flex-1 flex flex-col items-center justify-center w-full">
           <p className="text-zinc-300 text-sm sm:text-base mb-4">Target: <span className="text-yellow-500 font-bold text-lg">{target}%</span></p>
           
-          <div 
-            ref={cakeRef}
-            onMouseMove={handleMouseMove}
-            onTouchMove={handleMouseMove}
-            onPointerDown={handleCut}
-            className="w-40 h-40 sm:w-48 sm:h-48 rounded-full relative overflow-hidden cursor-crosshair shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-zinc-800 touch-none"
-          >
-            <img src="/cake-top.png" className="absolute inset-0 w-full h-full object-cover pointer-events-none" alt="Cake Top" />
-            <div className="absolute top-0 bottom-0 w-1 bg-white/80 shadow-[0_0_10px_white] pointer-events-none" style={{ left: `${knifePos}%` }} />
+          <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-full relative overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-zinc-800 pointer-events-none mb-6">
+            <img src="/cake-top.png" className="absolute inset-0 w-full h-full object-cover" alt="Cake Top" />
+            <div className="absolute top-0 bottom-0 w-1 bg-white/80 shadow-[0_0_10px_white] transition-all duration-75" style={{ left: `${knifePos}%` }} />
           </div>
-          <p className="text-[10px] sm:text-xs text-zinc-500 mt-4">Tap to drop the knife!</p>
+
+          <input type="range" min="0" max="100" step="0.5" value={knifePos} onChange={(e) => setKnifePos(parseFloat(e.target.value))} className="w-full max-w-[200px] accent-yellow-500 mb-6 cursor-grab active:cursor-grabbing" />
+          <button onClick={handleCut} className="w-full bg-yellow-500 text-black font-black py-3 rounded-xl active:scale-95 transition-transform shadow-lg text-sm sm:text-base">DROP KNIFE!</button>
         </div>
       )}
 
       {phase === 'result' && (
         <div className="flex-1 flex flex-col items-center justify-center animate-[fadeRise_0.5s_ease-out_forwards]">
           <p className="text-white text-lg sm:text-xl mb-4">Accuracy: <span className={accuracy >= 90 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{accuracy.toFixed(1)}%</span></p>
-          
           <div className="w-48 h-40 sm:w-56 sm:h-48 relative flex justify-center items-center mb-6 pointer-events-none">
             <motion.div initial={{ x: 0, opacity: 1 }} animate={{ x: -15, opacity: 0.8 }} transition={{ duration: 0.5, ease: "easeOut" }} className="absolute inset-0 flex items-center justify-center">
-              <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-full bg-zinc-800 overflow-hidden" style={{ clipPath: `polygon(0 0, ${cut}% 0, ${cut}% 100%, 0 100%)` }}>
-                <img src="/cake-top.png" className="w-full h-full object-cover" />
-              </div>
+              <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-full bg-zinc-800 overflow-hidden" style={{ clipPath: `polygon(0 0, ${cut}% 0, ${cut}% 100%, 0 100%)` }}><img src="/cake-top.png" className="w-full h-full object-cover" /></div>
             </motion.div>
             <motion.div initial={{ x: 0, opacity: 1 }} animate={{ x: 15, opacity: 0.8 }} transition={{ duration: 0.5, ease: "easeOut" }} className="absolute inset-0 flex items-center justify-center">
-              <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-full bg-zinc-800 overflow-hidden" style={{ clipPath: `polygon(${cut}% 0, 100% 0, 100% 100%, ${cut}% 100%)` }}>
-                <img src="/cake-top.png" className="w-full h-full object-cover" />
-              </div>
+              <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-full bg-zinc-800 overflow-hidden" style={{ clipPath: `polygon(${cut}% 0, 100% 0, 100% 100%, ${cut}% 100%)` }}><img src="/cake-top.png" className="w-full h-full object-cover" /></div>
             </motion.div>
           </div>
-
           <div className="w-full space-y-3">
             <div className="flex gap-2">
               <input type="text" value={inputName} onChange={(e) => setInputName(e.target.value)} placeholder="Name for board" className="flex-1 bg-black border border-white/20 rounded-lg px-3 py-2 text-white text-xs sm:text-sm" />
@@ -424,17 +488,84 @@ const FlappyBird = ({ imageUrl, name, addCurrency }) => {
   );
 };
 
+// --- SEAMLESS INFINITE VERTICAL ART CAROUSEL (LOCAL ASSETS) ---
+// --- SEAMLESS INFINITE VERTICAL ART CAROUSEL (LOCAL ASSETS) ---
+const FaceCollageBackground = ({ imageUrl }) => {
+  // Column 1
+  const art1 = [
+    // Mona Lisa
+    { src: '/art1.webp', faceX: '49%', faceY: '25%', faceW: '18%', rot: '0deg' },
+    // American Gothic (Covering the man's face)
+    { src: '/art2.jpg', faceX: '71%', faceY: '30%', faceW: '16%', rot: '0deg' },
+    // Girl with a Pearl Earring
+    { src: '/art3.jpg', faceX: '38%', faceY: '45%', faceW: '24%', rot: '-20deg' },
+  ];
+  
+  // Column 2
+  const art2 = [
+    // Van Gogh
+    { src: '/art4.jpg', faceX: '43%', faceY: '42%', faceW: '40%', rot: '-5deg' },
+    // The Scream
+    { src: '/art5.jpg', faceX: '53%', faceY: '60%', faceW: '18%', rot: '-5deg' },
+    // Napoleon
+    { src: '/art6.jpg', faceX: '70%', faceY: '22%', faceW: '14%', rot: '-10deg' },
+  ];
+
+  // Column 3
+  const art3 = [
+    // Adele Bloch-Bauer
+    { src: '/art7.jpg', faceX: '55%', faceY: '14%', faceW: '14%', rot: '0deg' },
+    // George Washington
+    { src: '/art8.jpg', faceX: '52%', faceY: '18%', faceW: '12%', rot: '0deg' },
+    // The Milkmaid
+    { src: '/art9.png', faceX: '52%', faceY: '25%', faceW: '12%', rot: '8deg' },
+  ];
+
+  const Track = ({ items, duration, reverse }) => (
+    <div 
+      className={`w-[28vw] sm:w-[22vw] flex flex-col gap-6 sm:gap-10 pt-6 sm:pt-10 scroll-track ${reverse ? 'reverse' : ''}`} 
+      style={{ '--duration': duration }}
+    >
+      {[...items, ...items, ...items, ...items].map((art, idx) => (
+        <div key={idx} className="relative w-full border-[6px] sm:border-[10px] border-[#d4af37] shadow-[0_15px_30px_rgba(0,0,0,0.8)] bg-zinc-900 rounded-sm overflow-hidden">
+          <img src={art.src} alt="Classic Art" className="w-full h-auto object-cover opacity-90" />
+          <img 
+            src={imageUrl} 
+            alt="Face" 
+            className="absolute rounded-[40%] object-cover shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+            style={{
+              left: art.faceX, 
+              top: art.faceY, 
+              width: art.faceW, 
+              aspectRatio: '3/4',
+              transform: `translate(-50%, -50%) rotate(${art.rot})`,
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-[1] opacity-50 flex justify-evenly sm:justify-center sm:gap-12 items-start bg-black">
+      <Track items={art1} duration="45s" />
+      <Track items={art2} duration="55s" reverse />
+      <Track items={art3} duration="50s" />
+    </div>
+  );
+};
 // --- MAIN HERO PAGE ---
 export default function HeroPage() {
   const { data } = useParams(); 
   const [parsedData, setParsedData] = useState(null);
+  const [eyeCoordinates, setEyeCoordinates] = useState({ leftEye: {x: 28, y: 35}, rightEye: {x: 72, y: 35} }); 
   const [error, setError] = useState(null);
   const topRef = useRef(null);
 
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const audioRef = useRef(new Audio('/bg-music.mp3'));
 
-  const [currency, setCurrency] = useState(200); 
+  const [currency, setCurrency] = useState(0); 
   const [visitorName, setVisitorName] = useState('');
   
   const [toasts, setToasts] = useState([]);
@@ -475,7 +606,17 @@ export default function HeroPage() {
         const { data: dbData, error: dbError } = await supabase.from('wishes').select('*').eq('id', data).single();
         if (dbError || !dbData || Date.now() > dbData.expires_at) { setError("Wish has expired."); return; }
 
-        setParsedData({ n: dbData.name, i: dbData.image_url, m: dbData.message, s: dbData.sender_name });
+        let finalSenderName = dbData.sender_name;
+        
+        try {
+          const parsedSender = JSON.parse(dbData.sender_name);
+          finalSenderName = parsedSender.name;
+          if (parsedSender.eyes) setEyeCoordinates(parsedSender.eyes);
+        } catch (e) {
+          // Legacy links fallback
+        }
+
+        setParsedData({ n: dbData.name, i: dbData.image_url, m: dbData.message, s: finalSenderName });
 
         const tenMins = 10 * 60 * 1000;
         if (Date.now() - dbData.pooped_at < tenMins) {
@@ -559,21 +700,23 @@ export default function HeroPage() {
   };
 
   return (
-    // overflow-x-hidden is crucial to prevent the tilted 3D background from causing horizontal scroll on phones
-    <div className={`relative w-full min-h-dvh text-white z-10 transition-all duration-[1200ms] ease-in-out origin-center overflow-x-hidden ${getSiteTransform()}`}>
+    <div className={`relative w-full min-h-screen bg-black text-white z-10 transition-all duration-[1200ms] ease-in-out origin-center overflow-x-hidden ${getSiteTransform()}`}>
       
       <div ref={topRef} className="absolute top-0 left-0 w-full h-1" />
 
-      {/* Name Input Modal */}
       <NamePromptModal 
         isOpen={!!pendingPrank} 
         onSubmit={(name) => { setVisitorName(name); executePrank(pendingPrank.cost, pendingPrank.type, name); }} 
         onCancel={() => setPendingPrank(null)} 
       />
 
-      <div className={`fixed inset-0 z-[-1] transition-opacity duration-1000 bg-cover bg-center ${cowPhase !== 'idle' ? 'opacity-100' : 'opacity-0'}`} style={{ backgroundImage: "url('/stable.jpg')" }} />
+     {/* ANIMATED ART COLLAGE BACKGROUND */}
+      <FaceCollageBackground imageUrl={parsedData.i} />
 
-      {/* Dynamic Toast System */}
+      {/* The Cow Background Fallback (Only shows when cow pranks happen) */}
+      <div className={`fixed inset-0 z-[-1] transition-opacity duration-1000 bg-zinc-950 ${cowPhase !== 'idle' ? 'opacity-100' : 'opacity-0'}`} />
+
+      
       <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 items-center pointer-events-none w-full px-4">
         {toasts.map(toast => (
           <div key={toast.id} className="bg-zinc-900 border border-white/20 text-white px-6 py-3 rounded-full font-medium shadow-2xl animate-[fadeRise_0.5s_ease-out_forwards] text-sm whitespace-nowrap">
@@ -582,7 +725,6 @@ export default function HeroPage() {
         ))}
       </div>
 
-      {/* HUD: Coins & Audio Controls */}
       <div className="fixed top-6 sm:top-10 right-4 sm:right-8 z-[60] flex flex-col gap-3 items-end">
         <div className="bg-black/80 backdrop-blur-md border border-yellow-500/50 text-yellow-400 px-4 py-2 rounded-full font-bold shadow-[0_0_15px_rgba(234,179,8,0.3)] text-sm sm:text-base">
           🪙 {currency} Coins
@@ -597,6 +739,22 @@ export default function HeroPage() {
       </div>
 
       <style>{`
+      .scroll-track {
+          animation: marqueeVert var(--duration) linear infinite;
+          will-change: transform;
+        }
+        .scroll-track.reverse {
+          animation-direction: reverse;
+        }
+        @keyframes marqueeVert {
+          0% { transform: translateY(0); }
+          /* Because we duplicated the items 4 times, shifting up exactly 25% skips perfectly back to frame 1! */
+          100% { transform: translateY(-25%); }
+        }
+        @keyframes floatUp {
+          0% { transform: translateY(100vh) scale(1) rotate(0deg); }
+          100% { transform: translateY(-120vh) scale(1.2) rotate(20deg); }
+        }
         @keyframes flyBuzz { 0% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(20px, -30px) rotate(45deg); } 50% { transform: translate(-30px, -10px) rotate(-20deg); } 75% { transform: translate(15px, 20px) rotate(60deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
         .fly { animation: flyBuzz 2s infinite linear; position: absolute; font-size: 2rem; pointer-events: none; z-index: 50; }
         @keyframes cowWalkIn { 0% { transform: translateX(-150vw); } 100% { transform: translateX(-5vw); } }
@@ -608,7 +766,6 @@ export default function HeroPage() {
         @keyframes fadeRise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      {/* --- PRANK ANIMATIONS --- */}
       {(cowPhase !== 'idle' && cowPhase !== 'shrinking') && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none overflow-hidden">
           {(cowPhase === 'walking' || cowPhase === 'pooping' || cowPhase === 'leaving') && (
@@ -644,20 +801,28 @@ export default function HeroPage() {
         </div>
       )}
 
-      {/* THE FULLSCREEN 3D PARALLAX BACKGROUND WITH GOOGLY EYES */}
-      <FullscreenInteractiveBackground 
-        imageUrl={parsedData.i} 
-        bites={bites} 
-        cakeMarks={cakeMarks} 
-        cowPhase={cowPhase} 
-      />
-
       <nav className="fixed top-0 w-full z-50 px-5 py-4 flex justify-start pointer-events-none">
-        <Link to="/" className="text-[14px] sm:text-[16px] text-white/70 hover:text-white bg-black/40 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full backdrop-blur-md border border-white/10 pointer-events-auto transition-colors">Create new wish</Link>
+        <Link to="/" className="text-[14px] sm:text-[16px] text-white/70 hover:text-white bg-black/40 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full backdrop-blur-md border border-white/10 pointer-events-auto transition-colors z-[60]">Create new wish</Link>
       </nav>
 
-      <main className="relative z-10 min-h-[90dvh] flex flex-col justify-center px-5 sm:px-10 pointer-events-none pt-24">
-        <div className="max-w-2xl mx-auto relative pointer-events-auto text-center w-full mt-auto mb-10">
+      <main className="relative z-10 flex flex-col justify-center items-center px-5 sm:px-10 pointer-events-none pt-32 pb-20 min-h-screen">
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="w-full flex justify-center pointer-events-auto"
+        >
+          <InteractivePlayingCard 
+            imageUrl={parsedData.i} 
+            eyeCoordinates={eyeCoordinates} 
+            bites={bites}
+            cakeMarks={cakeMarks}
+            cowPhase={cowPhase}
+          />
+        </motion.div>
+
+        <div className="max-w-2xl mx-auto relative pointer-events-auto text-center w-full mt-8">
           {hasFlies && (
             <>
               <div className="fly" style={{ top: '-50px', left: '10%', animationDelay: '0s' }}>🪰</div>
@@ -665,21 +830,27 @@ export default function HeroPage() {
               <div className="fly" style={{ top: '20px', right: '10%', animationDelay: '1s' }}>🪰</div>
             </>
           )}
-          <h1 className="select-none mb-4 font-bold drop-shadow-[0_0_15px_rgba(0,0,0,0.8)] tracking-tight" style={{ fontSize: 'clamp(32px, 8vw, 80px)', lineHeight: 1.1 }}>
+          <h1 className="select-none mb-4 font-bold tracking-tight" style={{ fontSize: 'clamp(32px, 8vw, 80px)', lineHeight: 1.1 }}>
             Happy Birthday,<br/>{parsedData.n}!
           </h1>
-          <p className="text-white/90 mb-6 min-h-[60px] drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] font-medium" style={{ fontSize: 'clamp(18px, 4vw, 28px)', lineHeight: 1.4 }}>
+          <p className="text-white/90 mb-6 min-h-[60px] font-medium" style={{ fontSize: 'clamp(18px, 4vw, 28px)', lineHeight: 1.4 }}>
             {displayed}
             {!done && <span className="inline-block w-[3px] h-[1em] bg-white align-middle ml-[4px]" style={{ animation: 'blink 1s step-end infinite' }} />}
           </p>
-          <div className="text-white/80 text-[18px] sm:text-[24px] italic drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] font-medium">— From {parsedData.s || 'Anonymous'}</div>
+          <div className="text-white/80 text-[18px] sm:text-[24px] italic font-medium">— From {parsedData.s || 'Anonymous'}</div>
         </div>
       </main>
 
-      <section className="relative z-20 min-h-screen pt-20 pb-32 px-4 sm:px-8 md:px-10 bg-gradient-to-b from-transparent via-zinc-950/90 to-zinc-950/95 overflow-hidden">
-        {/* Overlay to ensure readability on mobile */}
-        <div className="absolute inset-0 bg-black/60 sm:bg-black/50 backdrop-blur-xl z-[-1]" />
-
+      <section className="relative z-20 pt-10 pb-32 px-4 sm:px-8 md:px-10 overflow-hidden bg-black border-t border-white/5">
+      {/* 1. SMOOTH GRADIENT FADE (Fades the paintings into the dark gracefully) */}
+        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-transparent to-black pointer-events-none -translate-y-full" />
+        
+        {/* 2. SVG WAVE DIVIDER (Creates the organic curved edge) */}
+        <div className="absolute top-0 left-0 w-full leading-none pointer-events-none -translate-y-[99%] z-10">
+          <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-full h-[50px] sm:h-[90px]">
+            <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" fill="#000000"></path>
+          </svg>
+        </div>
         <div className="max-w-6xl mx-auto">
           <FadeInOnScroll delay={0}>
             <div className="text-center mb-10 sm:mb-16">
@@ -710,7 +881,7 @@ export default function HeroPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-3xl mx-auto pointer-events-auto">
             <FadeInOnScroll delay={200}>
-              <button onClick={() => handlePrankIntent(30, 'cow')} disabled={currency < 30} className="w-full flex items-center justify-between bg-black/50 border border-white/10 p-5 sm:p-6 rounded-3xl hover:bg-zinc-800 disabled:opacity-50 text-left transition-colors backdrop-blur-md">
+              <button onClick={() => handlePrankIntent(30, 'cow')} disabled={currency < 30} className="w-full flex items-center justify-between bg-zinc-900 border border-white/10 p-5 sm:p-6 rounded-3xl hover:bg-zinc-800 disabled:opacity-50 text-left transition-colors">
                 <div>
                   <h4 className="text-xl sm:text-2xl font-bold text-white mb-1">Cow Attack 🐄</h4>
                   <p className="text-zinc-400 text-xs sm:text-sm">A hungry cow eats their photo.</p>
@@ -720,7 +891,7 @@ export default function HeroPage() {
             </FadeInOnScroll>
 
             <FadeInOnScroll delay={300}>
-              <button onClick={() => handlePrankIntent(50, 'pie')} disabled={currency < 50} className="w-full flex items-center justify-between bg-black/50 border border-white/10 p-5 sm:p-6 rounded-3xl hover:bg-zinc-800 disabled:opacity-50 text-left transition-colors backdrop-blur-md">
+              <button onClick={() => handlePrankIntent(50, 'pie')} disabled={currency < 50} className="w-full flex items-center justify-between bg-zinc-900 border border-white/10 p-5 sm:p-6 rounded-3xl hover:bg-zinc-800 disabled:opacity-50 text-left transition-colors">
                 <div>
                   <h4 className="text-xl sm:text-2xl font-bold text-white mb-1">Cake Smash 🎂</h4>
                   <p className="text-zinc-400 text-xs sm:text-sm">Drop a giant cake on the screen.</p>
