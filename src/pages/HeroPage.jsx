@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import confetti from 'canvas-confetti';
-import { Menu, X, Play, ShoppingCart, Clock } from 'lucide-react';
+import { Menu, X, ShoppingCart } from 'lucide-react';
 import { supabase } from '../supabase'; 
+
+// Import the new modular components
+import WhackAMole from '../components/WhackAMole';
+import FlappyBird from '../components/FlappyBird';
 
 const playSound = (soundFile) => {
   const audio = new Audio(`/${soundFile}`);
@@ -32,83 +35,6 @@ const useTypewriter = (text, speed = 45, startDelay = 800) => {
   return { displayed, done };
 };
 
-// --- Games ---
-const WhackAMole = ({ imageUrl, name, addCurrency }) => {
-  const [activeHole, setActiveHole] = useState(null);
-  const [playing, setPlaying] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
-
-  useEffect(() => {
-    if (!playing || timeLeft <= 0) {
-      if (timeLeft === 0 && playing) setPlaying(false);
-      return;
-    }
-    const holeInterval = setInterval(() => setActiveHole(Math.floor(Math.random() * 9)), 600); 
-    const timerInterval = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    return () => { clearInterval(holeInterval); clearInterval(timerInterval); };
-  }, [playing, timeLeft]);
-
-  const whack = (index) => {
-    if (index === activeHole && playing) {
-      addCurrency(2); setActiveHole(null); 
-      confetti({ particleCount: 15, spread: 40, origin: { y: 0.8 }, colors: ['#facc15', '#ffffff'] });
-    }
-  };
-
-  return (
-    <div className="bg-black/40 border border-white/10 rounded-3xl p-8 flex flex-col items-center shadow-2xl relative z-20 pointer-events-auto">
-      <h3 className="text-3xl text-white mb-2 font-medium">Whack-a-{name}</h3>
-      <div className="flex gap-4 mb-6 text-zinc-400 font-medium">
-        <span className="flex items-center gap-1"><Clock size={16}/> {timeLeft}s</span>
-        <span>Earns: 2 Coins</span>
-      </div>
-      {!playing && timeLeft === 0 ? (
-        <button onClick={() => { setPlaying(true); setTimeLeft(15); }} className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full font-bold hover:bg-zinc-200 mb-4"><Play size={18} /> Start (15s)</button>
-      ) : (
-        <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-sm mb-4">
-          {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((index) => (
-            <div key={index} className="aspect-square bg-zinc-900 rounded-2xl overflow-hidden relative border border-white/5 cursor-pointer" onClick={() => whack(index)}>
-              <div className="absolute bottom-0 w-full h-1/3 bg-black/60 rounded-t-full z-10 pointer-events-none" />
-              <img src={imageUrl} alt="Face" className={`absolute bottom-0 w-full h-[80%] object-cover object-top rounded-t-full transition-transform duration-100 ${activeHole === index ? 'translate-y-0' : 'translate-y-full'}`} />
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const SpinTheFace = ({ imageUrl, name, addCurrency }) => {
-  const [clicks, setClicks] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
-
-  useEffect(() => {
-    if (!playing || timeLeft <= 0) { if (timeLeft === 0 && playing) setPlaying(false); return; }
-    const timerInterval = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    return () => clearInterval(timerInterval);
-  }, [playing, timeLeft]);
-
-  return (
-    <div className="bg-black/40 border border-white/10 rounded-3xl p-8 flex flex-col items-center justify-center shadow-2xl text-center relative z-20 pointer-events-auto">
-      <h3 className="text-3xl text-white mb-2 font-medium">Dizzy {name}</h3>
-      <div className="flex gap-4 mb-8 text-zinc-400 font-medium">
-        <span className="flex items-center gap-1"><Clock size={16}/> {timeLeft}s</span>
-        <span>Earns: 1 Coin/Click</span>
-      </div>
-      {!playing && timeLeft === 0 ? (
-        <button onClick={() => { setClicks(0); setPlaying(true); setTimeLeft(10); }} className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full font-bold hover:bg-zinc-200 mb-4"><Play size={18} /> Start (10s)</button>
-      ) : (
-        <button onClick={() => { if (playing) { setClicks(c => c + 1); addCurrency(1); } }} className="relative group cursor-pointer focus:outline-none">
-          <div className="absolute inset-0 bg-white/20 blur-xl rounded-full group-hover:bg-white/40" />
-          <img src={imageUrl} alt="Spinning" className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full border-4 border-white object-cover shadow-2xl" style={{ transition: 'transform 0.1s linear', transform: `rotate(${clicks * 45}deg) scale(${1 + (clicks % 5 === 0 && clicks > 0 ? 0.1 : 0)})` }} />
-        </button>
-      )}
-      <p className="text-white mt-8 h-6">{clicks > 0 && `Spun ${clicks} times!`}</p>
-    </div>
-  );
-};
-
 // --- Main Page ---
 export default function HeroPage() {
   const { data } = useParams(); 
@@ -122,12 +48,11 @@ export default function HeroPage() {
   const [visitorName, setVisitorName] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   
-  // Database Persisted States
   const [hasFlies, setHasFlies] = useState(false);
-  const [hasCakeMarks, setHasCakeMarks] = useState(false);
+  const [cakeMarks, setCakeMarks] = useState([]);
 
   // Cow Sequence States
-  const [cowPhase, setCowPhase] = useState('idle'); // idle, walking, pooping, leaving, zooming
+  const [cowPhase, setCowPhase] = useState('idle'); 
   const [bites, setBites] = useState(0); 
 
   // Pie Prank States
@@ -137,23 +62,10 @@ export default function HeroPage() {
   useEffect(() => {
     const fetchWish = async () => {
       try {
-        const { data: dbData, error: dbError } = await supabase
-          .from('wishes')
-          .select('*')
-          .eq('id', data)
-          .single();
+        const { data: dbData, error: dbError } = await supabase.from('wishes').select('*').eq('id', data).single();
+        if (dbError || !dbData || Date.now() > dbData.expires_at) { setError("Wish has expired."); return; }
 
-        if (dbError || !dbData || Date.now() > dbData.expires_at) {
-          setError("Wish has expired or doesn't exist.");
-          return;
-        }
-
-        setParsedData({
-          n: dbData.name,
-          i: dbData.image_url,
-          m: dbData.message,
-          s: dbData.sender_name
-        });
+        setParsedData({ n: dbData.name, i: dbData.image_url, m: dbData.message, s: dbData.sender_name });
 
         const tenMins = 10 * 60 * 1000;
         if (Date.now() - dbData.pooped_at < tenMins) {
@@ -161,19 +73,34 @@ export default function HeroPage() {
           setToastMessage(`💩 ${dbData.pooped_by || 'Someone'} ruined this site with poop!`);
           setTimeout(() => setToastMessage(''), 5000);
         }
+        
         if (Date.now() - dbData.caked_at < tenMins) {
-          setHasCakeMarks(true);
+          setCakeMarks([{ 
+            id: 'initial_db', 
+            top: Math.random() * 70 + 10 + '%', 
+            left: Math.random() * 70 + 10 + '%', 
+            rotation: Math.random() * 360,
+            timestamp: dbData.caked_at
+          }]);
+          
           if (!dbData.pooped_at || Date.now() - dbData.pooped_at >= tenMins) {
              setToastMessage(`🎂 ${dbData.caked_by || 'Someone'} threw a cake at this!`);
              setTimeout(() => setToastMessage(''), 5000);
           }
         }
-      } catch (err) {
-        setError("Network error.");
-      }
+      } catch (err) { setError("Network error."); }
     };
     fetchWish();
   }, [data]);
+
+  // Clean up old cake marks
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setCakeMarks(marks => marks.filter(m => now - m.timestamp < 10 * 60 * 1000));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { displayed, done } = useTypewriter(parsedData?.m || "", 45, 800);
   const addCurrency = (amount) => setCurrency(prev => prev + amount);
@@ -192,39 +119,24 @@ export default function HeroPage() {
 
     setCurrency(c => c - cost);
     playSound('cha-ching.mp3');
-    
-    // Auto-scroll to top reliably
     topRef.current?.scrollIntoView({ behavior: 'smooth' });
 
     setTimeout(async () => {
       if (type === 'cow') {
         setCowPhase('walking');
-        
-        // Cow walks in, reaches center, bites start (with bite sounds)
         setTimeout(() => { setBites(1); playSound('bite.mp3'); }, 2200); 
         setTimeout(() => { setBites(2); playSound('bite.mp3'); }, 2600); 
         setTimeout(() => { setBites(3); playSound('bite.mp3'); }, 3000); 
         
-        // Cow Poops (with falling animation + fart sound synced)
-        setTimeout(() => {
-          setCowPhase('pooping');
-          playSound('fart.mp3');
-        }, 3800);
-
-        // Cow leaves
+        setTimeout(() => { setCowPhase('pooping'); playSound('fart.mp3'); }, 3800);
         setTimeout(() => setCowPhase('leaving'), 4500);
-
-        // Zoom directly into the centered poop
         setTimeout(() => setCowPhase('zooming'), 5800);
 
-        // Reset and show flies globally
         setTimeout(async () => {
           setCowPhase('idle');
           setBites(0);
           setHasFlies(true);
           playSound('buzz.mp3'); 
-          
-          // Update Supabase
           await supabase.from('wishes').update({ pooped_at: Date.now(), pooped_by: vName }).eq('id', data);
         }, 9500);
       }
@@ -232,28 +144,66 @@ export default function HeroPage() {
       if (type === 'pie') {
         setIsPieing(true);
         setTimeout(() => playSound('splat.mp3'), 1500);
+        
         setTimeout(async () => {
           setIsPieing(false);
-          setHasCakeMarks(true);
+          const newMark = {
+            id: Date.now(),
+            top: Math.random() * 70 + 5 + '%', 
+            left: Math.random() * 70 + 5 + '%', 
+            rotation: Math.random() * 360,
+            timestamp: Date.now()
+          };
+          setCakeMarks(prev => [...prev, newMark]);
           await supabase.from('wishes').update({ caked_at: Date.now(), caked_by: vName }).eq('id', data);
         }, 4500);
       }
     }, 800);
   };
 
-  useEffect(() => {
+useEffect(() => {
+    // 1. Desktop Mouse Movement
     const handleMouseMove = (e) => {
-      if (!bgRef.current || window.scrollY > window.innerHeight) return;
+      if (!bgRef.current || window.scrollY > window.innerHeight || cowPhase !== 'idle') return;
       const { innerWidth, innerHeight } = window;
       const rotateX = ((e.clientY / innerHeight - 0.5) * 2) * -8; 
       const rotateY = ((e.clientX / innerWidth - 0.5) * 2) * 8;
       bgRef.current.style.transform = `perspective(1000px) scale(1.08) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
     };
-    const handleMouseLeave = () => { if (bgRef.current) bgRef.current.style.transform = `perspective(1000px) scale(1.05) rotateX(0deg) rotateY(0deg)`; };
+
+    // 2. Mobile Gyroscope / Accelerometer
+    const handleOrientation = (e) => {
+      if (!bgRef.current || window.scrollY > window.innerHeight || cowPhase !== 'idle') return;
+      
+      let { beta, gamma } = e; 
+      if (beta === null || gamma === null) return;
+
+      // Clamp the values so it doesn't spin wildly if they hold the phone weirdly
+      beta = Math.max(-45, Math.min(45, beta)); // Tilt front-to-back
+      gamma = Math.max(-45, Math.min(45, gamma)); // Tilt left-to-right
+
+      // Map tilt angles to standard 8-degree rotation limits
+      const rotateX = (beta / 45) * -8;
+      const rotateY = (gamma / 45) * 8;
+
+      bgRef.current.style.transform = `perspective(1000px) scale(1.08) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    };
+
+    const handleMouseLeave = () => { 
+      if (bgRef.current) bgRef.current.style.transform = `perspective(1000px) scale(1.05) rotateX(0deg) rotateY(0deg)`; 
+    };
+
+    // Attach listeners
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseleave', handleMouseLeave);
-    return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseleave', handleMouseLeave); };
-  }, []);
+    window.addEventListener('deviceorientation', handleOrientation);
+
+    return () => { 
+      window.removeEventListener('mousemove', handleMouseMove); 
+      window.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('deviceorientation', handleOrientation);
+    };
+  }, [cowPhase]);
 
   if (error) return <div className="h-screen flex items-center justify-center bg-black text-white text-2xl">{error}</div>;
   if (!parsedData) return <div className="h-screen bg-black" />;
@@ -282,20 +232,16 @@ export default function HeroPage() {
         @keyframes dropAndTilt { 0% { transform: translateY(-100vh) rotate(0deg); } 70% { transform: translateY(0) rotate(0deg); } 90% { transform: translateY(0) rotate(45deg); opacity: 1; } 100% { transform: translateY(0) rotate(90deg); opacity: 0; } }
         @keyframes splatExplode { 0% { transform: scale(0); opacity: 0; } 10% { transform: scale(1); opacity: 0.9; } 80% { transform: scale(1.1) translateY(5%); opacity: 0.9; } 100% { transform: scale(1.2) translateY(10%); opacity: 0; } }
         
-        /* UPDATED: Poop now shoots out from the cow's rear and drops to the center */
         @keyframes poopDrop { 
-          0% { transform: translate(80px, -120px) scale(0); opacity: 0; } 
-          30% { transform: translate(80px, -120px) scale(1); opacity: 1; }
-          100% { transform: translate(0, 0) scale(1); opacity: 1; } 
+          0% { transform: translate(-80px, -20px) scale(0); opacity: 0; } 
+          100% { transform: translate(0, 40px) scale(1); opacity: 1; } 
         }
         @keyframes fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
       `}</style>
 
-  {/* --- COW PRANK ANIMATIONS --- */}
+      {/* --- COW PRANK ANIMATIONS --- */}
       {(cowPhase !== 'idle') && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none overflow-hidden">
-          
-          {/* The Cow */}
           {(cowPhase === 'walking' || cowPhase === 'pooping' || cowPhase === 'leaving') && (
             <div className="text-[250px] drop-shadow-2xl absolute"
                  style={{ 
@@ -306,18 +252,11 @@ export default function HeroPage() {
             </div>
           )}
 
-          {/* The Poop (Drops from Cow's Ass, then stays during leaving and zooming) */}
           {(cowPhase === 'pooping' || cowPhase === 'leaving' || cowPhase === 'zooming') && (
             <div className="absolute inset-0 flex items-center justify-center">
-              
-              {/* Outer div handles the 3x zoom effect */}
               <div className={`transition-transform duration-[2000ms] ease-in-out ${cowPhase === 'zooming' ? 'scale-[3]' : 'scale-100'}`}>
-                
-                {/* Inner div handles the falling drop animation from the cow */}
-                <div className="relative animate-[poopDrop_0.5s_ease-in_forwards]">
+                <div className="relative animate-[poopDrop_0.4s_ease-in_forwards]">
                   <img src="/poop.png" alt="Poop" className="w-[30vw] h-[30vw] max-w-[300px] max-h-[300px] object-contain drop-shadow-2xl" />
-                  
-                  {/* Tiny Faces in the poop during zoom */}
                   {cowPhase === 'zooming' && (
                     <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-2 opacity-0 animate-[fadeIn_0.5s_ease-out_0.5s_forwards]">
                       <img src={parsedData.i} className="w-10 h-10 rounded-full border border-black object-cover" />
@@ -344,30 +283,36 @@ export default function HeroPage() {
         </div>
       )}
 
-      {/* --- MAIN SITE WRAPPER (Fades out when camera zooms into poop) --- */}
+      {/* --- MAIN SITE WRAPPER --- */}
       <div className={`relative w-full text-white z-10 transition-all duration-[2000ms] ease-in-out origin-center
         ${cowPhase === 'zooming' ? 'scale-[3] opacity-0' : 'scale-100 opacity-100'}`}>
         
-        {/* Parallax Background */}
         <div className="fixed inset-0 z-0 bg-black overflow-hidden flex items-center justify-center">
           <div ref={bgRef} className="w-full h-full relative transition-transform duration-[400ms] ease-out will-change-transform" style={{ transform: 'perspective(1000px) scale(1.05) rotateX(0deg) rotateY(0deg)' }}>
             
             <img src={parsedData.i} alt="Background" className={`w-full h-full object-cover transition-opacity duration-300 ${bites >= 3 ? 'opacity-0' : 'opacity-100'}`} />
             
-            {/* Bites taking chunks out of the image */}
             {bites >= 1 && <div className="absolute -top-[10%] -right-[10%] w-[50vw] h-[50vw] bg-black rounded-full" />}
             {bites >= 2 && <div className="absolute -bottom-[20%] -left-[10%] w-[60vw] h-[60vw] bg-black rounded-full" />}
             {bites >= 3 && <div className="absolute inset-0 bg-black" />} 
             
-            {/* Persistent Blue Splatters */}
-            {hasCakeMarks && (
+            {/* Dynamic Cake Marks */}
+            {cakeMarks.length > 0 && (
               <div className="absolute inset-0 opacity-80 pointer-events-none">
-                <svg viewBox="0 0 100 100" className="absolute top-[20%] left-[20%] w-48 h-48 fill-blue-500/80 transform rotate-12">
-                  <path d="M50 10 C 60 30, 80 20, 75 40 C 95 45, 80 60, 90 75 C 70 70, 60 95, 50 80 C 40 95, 30 70, 10 75 C 20 60, 5 45, 25 40 C 20 20, 40 30, 50 10 Z" />
-                </svg>
-                <svg viewBox="0 0 100 100" className="absolute top-[60%] right-[10%] w-64 h-64 fill-blue-500/70 transform -rotate-45">
-                  <path d="M50 10 C 60 30, 80 20, 75 40 C 95 45, 80 60, 90 75 C 70 70, 60 95, 50 80 C 40 95, 30 70, 10 75 C 20 60, 5 45, 25 40 C 20 20, 40 30, 50 10 Z" />
-                </svg>
+                {cakeMarks.map((mark) => (
+                  <svg 
+                    key={mark.id}
+                    viewBox="0 0 100 100" 
+                    className="absolute w-40 h-40 fill-blue-500/80" 
+                    style={{ 
+                      top: mark.top, 
+                      left: mark.left, 
+                      transform: `rotate(${mark.rotation}deg)` 
+                    }}
+                  >
+                    <path d="M50 10 C 60 30, 80 20, 75 40 C 95 45, 80 60, 90 75 C 70 70, 60 95, 50 80 C 40 95, 30 70, 10 75 C 20 60, 5 45, 25 40 C 20 20, 40 30, 50 10 Z" />
+                  </svg>
+                ))}
               </div>
             )}
           </div>
@@ -382,8 +327,7 @@ export default function HeroPage() {
 
         <main className="relative z-10 h-screen flex flex-col justify-center px-5 sm:px-8 md:px-10 pointer-events-none">
           <div className="max-w-2xl relative pointer-events-auto">
-            {/* The Flies (Persist after reset) */}
-            {(hasFlies) && (
+            {hasFlies && (
               <>
                 <div className="fly" style={{ top: '-50px', left: '100px', animationDelay: '0s' }}>🪰</div>
                 <div className="fly" style={{ top: '50px', left: '-20px', animationDelay: '0.5s' }}>🪰</div>
@@ -407,8 +351,11 @@ export default function HeroPage() {
               <h2 className="text-4xl md:text-5xl text-white mb-4 font-medium">Earn Coins</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-24">
+              
+              {/* USING THE NEW MODULAR COMPONENTS */}
               <WhackAMole imageUrl={parsedData.i} name={parsedData.n} addCurrency={addCurrency} />
-              <SpinTheFace imageUrl={parsedData.i} name={parsedData.n} addCurrency={addCurrency} />
+              <FlappyBird imageUrl={parsedData.i} name={parsedData.n} addCurrency={addCurrency} />
+              
             </div>
 
             <div className="text-center mb-10 pointer-events-auto">
